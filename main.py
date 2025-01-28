@@ -12,6 +12,8 @@ import logging
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -105,7 +107,7 @@ class FFmpegRecorder:
 
         cmd = [
             self.args.ffmpeg_path,
-            "-hide_banner",
+            "-hide_banner", "-nostats" if self.args.nostats else "",
             "-rtsp_transport", self.args.rtsp_transport,
             "-i", self.args.rtsp_url,
             "-c", "copy",
@@ -118,6 +120,7 @@ class FFmpegRecorder:
         self.process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
+            cwd=script_dir,
         )
 
         monitor_thread = threading.Thread(target=self._monitor_process)
@@ -313,6 +316,9 @@ def signal_handler(sig, frame, recorder, cleaner):
     sys.exit(0)
 
 def main():
+    # 切换工作目录
+    os.chdir(script_dir)
+
     parser = argparse.ArgumentParser(
         description="跨平台RTSP流媒体录像机",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -352,6 +358,10 @@ def main():
                       help="FFmpeg最大延迟微秒数")
     parser.add_argument("--stimeout", type=int, default=20000000,
                       help="FFmpeg socket超时微秒数")
+    parser.add_argument("--loglevel", type=str, default="info",
+                      help="FFmpeg loglevel")
+    parser.add_argument("--nostats", type=bool, default=False,
+                      help="FFmpeg nostats")
     parser.add_argument("--rtsp_transport", default="tcp",
                       choices=["tcp", "udp", "http"],
                       help="RTSP传输协议")

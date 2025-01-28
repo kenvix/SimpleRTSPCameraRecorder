@@ -5,14 +5,14 @@ STOP=15
 USE_PROCD=1
 PROG=/usr/bin/python
 SCRIPT=/home/camera/main.py
-ARGS="--rtsp_url='rtsp://...'"
+ARGS="--rtsp_url=rtsp://admin:password@192.168.1.2:554/stream1 --loglevel=warning --nostats=True"
 WORKDIR=/home/camera
 PIDFILE=/var/run/camera.pid
 
 start_service() {
+    cd "$WORKDIR"
     procd_open_instance
     procd_set_param command "$PROG" "$SCRIPT" $ARGS
-    procd_set_param file "$SCRIPT"
     procd_set_param working_dir "$WORKDIR"
     procd_set_param pidfile "$PIDFILE"
     procd_set_param stdout 1
@@ -30,11 +30,23 @@ stop_service() {
         if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
             # 发送 SIGTERM 信号
             kill -SIGINT "$pid"
-            sleep 1s
-            kill -SIGINT "$pid"
             
-            # 等待进程结束（最多120秒）
-            local timeout=120
+            # 等待进程结束
+            local timeout=15
+            while [ $timeout -gt 0 ]; do
+                if ! kill -0 "$pid" 2>/dev/null; then
+                    # 进程已经终止
+                    rm -f "$PIDFILE"
+                    return 0
+                fi
+                sleep 1
+                timeout=$((timeout - 1))
+            done
+
+            kill -SIGINT "$pid" || true
+
+            # 等待进程结束
+            timeout=5
             while [ $timeout -gt 0 ]; do
                 if ! kill -0 "$pid" 2>/dev/null; then
                     # 进程已经终止
